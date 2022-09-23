@@ -7,41 +7,50 @@ from os import PathLike
 
 
 def _convert_single(val, aType, for_json) -> any:
-    valueType = type(val)
-    if valueType is int and aType is int \
-            or valueType is str and aType is str \
-            or valueType is float and aType is float \
-            or valueType is list and aType is list \
-            or valueType is any and aType is any:
-        return val
-    elif valueType is datetime and aType is datetime:
+    origin = typing.get_origin(aType)
+    if origin:
+        args = typing.get_args(origin)
+        if origin is list:
+            if args is list:
+                return [_convert_single(newVal, args[0], for_json) for newVal in val]
+            if args is datetime:
+                return [_convert_single(newVal, datetime, for_json) for newVal in val]
+            else:
+                return val
+        elif origin is dict:
+            return val
+        raise TypeError("Unsupported type")
+    elif aType is datetime:
         if for_json:
             return val.isoformat()
         else:
             return val
-    elif valueType is dict:
-        new = {}
-        for key, value in val.items():
-            dictValType = type(value)
-            new[key] = _convert_single(value, dictValType, for_json) if dictValType != list else _convert_list_for_dict(value, dictValType, for_json)
-        return new
-    raise TypeError(f"Type {valueType.__name__} is not the allowed type {aType.__name__} for this value")
+    elif aType is list:
+        return val
+    else:
+        return val
 
 
-def _convert_list_for_dict(cList, aType, for_json) -> any:
+def _load_single(val, aType) -> any:
     origin = typing.get_origin(aType)
     if origin:
-        newType = typing.get_args(aType)[0]
+        args = typing.get_args(origin)
         if origin is list:
-            return [_convert_list_for_dict(newList, newType, for_json) for newList in cList]
-        return [_convert_single(val, origin, for_json) for val in cList]
-    if aType is list:
-        return _convert_list_for_dict(cList, aType, for_json)
+            if args is list:
+                return [_load_single(newVal, args[0]) for newVal in val]
+            if args is datetime:
+                return [_load_single(newVal, datetime) for newVal in val]
+            else:
+                return val
+        elif origin is dict:
+            return val
+        raise TypeError("Unsupported type")
+    elif aType is datetime:
+        return datetime.fromisoformat(val)
+    elif aType is list:
+        return val
     else:
-        try:
-            return [_convert_single(val, aType, for_json) for val in cList]
-        except TypeError as e:
-            raise TypeError(f"A type from a value in the list is a different as the default type") from None
+        return aType(val)
 
 
 class Clason:
@@ -57,32 +66,16 @@ class Clason:
         dictionary = {}
         for key, value in self.__dict__.items():
             allowedType = self.__type_list__[key]
-            origin = typing.get_origin(allowedType)
-            if origin:
-                args = typing.get_args(allowedType)
-                if not len(args):
-                    raise TypeError("Something is append")
-                if origin is list:
-                    dictionary[key] = _convert_list_for_dict(value, args[0], for_json)
-                elif origin is dict:
-                    dictionary[key] = _convert_single(value, args[0], for_json)
+            try:
+                dictionary[key] = _convert_single(value, allowedType, for_json)
+            except TypeError as e:
+                if self.__type_checking__:
+                    raise TypeError(
+                        f"Error in key '{key}' current type is {type(value).__name__}, "
+                        f"the default type is {allowedType.__name__}"
+                    ) from None
                 else:
-                    if self.__type_checking__:
-                        raise TypeError(
-                            f"Error in key '{key}', "
-                            f"the type of the key is a list but the sup type {args[0].__name__} is not supported"
-                        )
-            else:
-                try:
-                    dictionary[key] = _convert_single(value, allowedType, for_json)
-                except TypeError as e:
-                    if self.__type_checking__:
-                        raise TypeError(
-                            f"Error in key '{key}' current type is {type(value).__name__}, "
-                            f"the default type is {allowedType.__name__}"
-                        ) from None
-                    else:
-                        dictionary[key] = value
+                    dictionary[key] = value
 
         return dictionary
 
@@ -105,14 +98,7 @@ class Clason:
             if not cls.__type_list__.__contains__(key):
                 cls.__type_list__[key] = typeOfKey
             if dictionary.__contains__(key):
-                if not isinstance(dictionary[key], typeOfKey) and cls.__type_checking__:
-                    raise TypeError(f"Key '{key}' must be a {typeOfKey.__name__} not an {type(dictionary[key]).__name__}")
-                if typeOfKey == datetime:
-                    child.__dict__[key] = datetime.fromisoformat(dictionary[key])
-                if typing.get_origin(typeOfKey):
-                    print(origin)
-                else:
-                    child.__dict__[key] = dictionary[key]
+                child.__dict__[key] = _load_single(dictionary[key], typeOfKey)
             else:
                 try:
                     cls.__dict__[key]
