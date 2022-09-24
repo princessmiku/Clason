@@ -64,6 +64,7 @@ class Clason:
         :return:
         """
         dictionary = {}
+        self.__load_types()
         for key, value in self.__dict__.items():
             allowedType = self.__type_list__[key]
             try:
@@ -83,20 +84,25 @@ class Clason:
         return json.dumps(self.clason_dump_d(for_json=True), indent=indent)
 
     def clason_dump(self, path: str | PathLike, indent: None | int | str = None):
-        json.dump(self.clason_dump_d(for_json=True), open(path, mode='w'), indent=indent)
+        jsonData = self.clason_dumps(indent)
+        with open(path, mode='w') as f:
+            f.write(jsonData)
+            f.close()
 
     @classmethod
     def clason_load_d(cls, dictionary: dict):
         if not cls.__dict__.__contains__("__annotations__"):
             raise KeyError("no annotations was found")
         if not isinstance(dictionary, dict):
-            raise TypeError("The json is a list not an dict, use clason.loads_many for more than one")
-        child = cls()
+            raise TypeError(
+                "The json is a list not an dict, use clason.load_many / clason.loads_many for more than one object"
+            )
+        child = cls.__new__(cls)
+        child.clason_on_init_start()
+        cls.__load_types()
         for key in cls.__dict__["__annotations__"]:
             typeOfKey: type = cls.__dict__["__annotations__"][key]
             origin: any = typing.get_origin(typeOfKey)
-            if not cls.__type_list__.__contains__(key):
-                cls.__type_list__[key] = typeOfKey
             if dictionary.__contains__(key):
                 child.__dict__[key] = _load_single(dictionary[key], typeOfKey)
             else:
@@ -117,6 +123,7 @@ class Clason:
                         elif cls.__type_checking__:
                             raise e
                     child.__dict__[key] = value
+        child.clason_on_init_end()
         return child
 
     @classmethod
@@ -126,3 +133,58 @@ class Clason:
     @classmethod
     def clason_load(cls, path: str | PathLike):
         return cls.clason_load_d(json.load(open(path, mode="r")))
+
+    @classmethod
+    def __load_types(cls):
+
+        for key in cls.__dict__["__annotations__"]:
+            if not cls.__type_list__.__contains__(key):
+                cls.__type_list__[key] = cls.__dict__["__annotations__"][key]
+
+    def clason_on_init_start(self):
+        """
+        this function starts at the beginning of the init (no variables are assigned from clason)
+        an init function if clason load the class.
+        the normal __init__ function is not working, but if you need it use this
+        - no function variables allowed -
+        """
+        pass
+
+    def clason_on_init_end(self):
+        """
+        this function starts at the end of the init (the variables are assigned from clason)
+        an init function if clason load the class.
+        the normal __init__ function is not working, but if you need it use this
+        - no function variables allowed -
+        """
+        pass
+
+
+def load_many_d(listOfClass: list, targetClass) -> list[any]:
+    if not issubclass(targetClass, Clason): raise TypeError('Target class is not extend Clason')
+    return [targetClass.clason_load_d(c) for c in listOfClass]
+
+
+def loads_many(jsonStr: str, targetClass) -> list[any]:
+    if not issubclass(targetClass, Clason): raise TypeError('Target class is not extend Clason')
+    return load_many_d(json.loads(jsonStr), targetClass)
+
+
+def load_many(path: str | PathLike, targetClass) -> list[any]:
+    if not issubclass(targetClass, Clason): raise TypeError('Target class is not extend Clason')
+    return load_many_d(json.load(open(path, mode='r')), targetClass)
+
+
+def dump_many_d(listOfClass) -> list[any]:
+    return [c.clason_dump_d(True) for c in listOfClass]
+
+
+def dumps_many(listOfClass, indent: None | int | str = None) -> str:
+    return json.dumps(dump_many_d(listOfClass), indent=indent)
+
+
+def dump_many(path: str | PathLike, listOfClass, indent: None | int | str = None):
+    jsonData = dumps_many(listOfClass, indent)
+    with open(path, mode='w') as f:
+        f.write(jsonData)
+        f.close()
