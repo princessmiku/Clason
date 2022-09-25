@@ -9,17 +9,21 @@ from os import PathLike
 def _convert_single(val, aType, for_json) -> any:
     origin = typing.get_origin(aType)
     if origin:
-        args = typing.get_args(origin)
+        args = typing.get_args(aType)
         if origin is list:
             if args is list:
                 return [_convert_single(newVal, args[0], for_json) for newVal in val]
             if args is datetime:
                 return [_convert_single(newVal, datetime, for_json) for newVal in val]
+            if issubclass(args[0], Clason):
+                return [newVal.clason_dump_d(for_json) for newVal in val]
             else:
                 return val
         elif origin is dict:
             return val
         raise TypeError("Unsupported type")
+    elif issubclass(aType, Clason):
+        return val.clason_dump_d(for_json)
     elif aType is datetime:
         if for_json:
             return val.isoformat()
@@ -34,17 +38,21 @@ def _convert_single(val, aType, for_json) -> any:
 def _load_single(val, aType) -> any:
     origin = typing.get_origin(aType)
     if origin:
-        args = typing.get_args(origin)
+        args = typing.get_args(aType)
         if origin is list:
             if args is list:
                 return [_load_single(newVal, args[0]) for newVal in val]
             if args is datetime:
                 return [_load_single(newVal, datetime) for newVal in val]
+            if issubclass(args[0], Clason):
+                return [args[0].clason_load_d(newVal) for newVal in val]
             else:
                 return val
         elif origin is dict:
             return val
         raise TypeError("Unsupported type")
+    elif issubclass(aType, Clason):
+        return aType.clason_load_d(val)
     elif aType is datetime:
         return datetime.fromisoformat(val)
     elif aType is list:
@@ -64,13 +72,13 @@ class Clason:
         :return:
         """
         dictionary = {}
-        self.__load_types()
         for key, value in self.__dict__.items():
             allowedType = self.__type_list__[key]
             try:
                 dictionary[key] = _convert_single(value, allowedType, for_json)
             except TypeError as e:
                 if self.__type_checking__:
+                    print(e)
                     raise TypeError(
                         f"Error in key '{key}' current type is {type(value).__name__}, "
                         f"the default type is {allowedType.__name__}"
@@ -99,7 +107,7 @@ class Clason:
             )
         child = cls.__new__(cls)
         child.clason_on_init_start()
-        cls.__load_types()
+
         for key in cls.__dict__["__annotations__"]:
             typeOfKey: type = cls.__dict__["__annotations__"][key]
             origin: any = typing.get_origin(typeOfKey)
@@ -134,12 +142,14 @@ class Clason:
     def clason_load(cls, path: str | PathLike):
         return cls.clason_load_d(json.load(open(path, mode="r")))
 
-    @classmethod
-    def __load_types(cls):
-
+    def __new__(cls, *args, **kwargs):
+        obj = object.__new__(cls)
         for key in cls.__dict__["__annotations__"]:
+            if cls.__dict__.__contains__(key):
+                obj.__dict__[key] = cls.__dict__[key]
             if not cls.__type_list__.__contains__(key):
                 cls.__type_list__[key] = cls.__dict__["__annotations__"][key]
+        return obj
 
     def clason_on_init_start(self):
         """
