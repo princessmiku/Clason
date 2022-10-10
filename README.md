@@ -1,5 +1,12 @@
 # Clason
-Json Classes, load classes and save classes with json
+
+----
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python - ^3.10](https://img.shields.io/badge/Python-^3.10-blue)](https://www.python.org/)
+[![Downloads](https://pepy.tech/badge/clason)](https://pepy.tech/project/clason)
+
+
+Load your classes with json and save it with json or work with python dictionary's
 
 For an example usage look in the folder ``example``
 
