@@ -3,7 +3,7 @@ from setuptools import setup
 
 HERE = pathlib.Path(__file__).parent
 README = (HERE / "README.md").read_text()
-VERSION = '1.0'
+VERSION = '1.0.1'
 setup(
     name='Clason',
     long_description=README,
