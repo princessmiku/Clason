@@ -70,7 +70,6 @@ anna.subjects.append(Subject("Math", [3, 4, 2, 2, 1, 4, 3, 3]))
 # Random address with https://www.randomlists.com/texas-addresses
 rene = Student("Rene", 25, Address('North Argyle Ave.', 81, 'Humble - TX 77339', 'United States'))
 rene.subjects.append(Subject("Math", [4, 5, 5, 2, 3, 3, 1, 6]))
-
 # example save a class
 anna.clason_dump('./anna.json')
 rene.clason_dump('./rene.json')
