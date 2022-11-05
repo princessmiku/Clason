@@ -56,6 +56,7 @@ def _load_single(val, aType) -> any:
     elif aType is datetime:
         return datetime.fromisoformat(val)
     elif aType is list:
+        if isinstance(val, str): return json.loads(val)
         return val
     else:
         return aType(val)
