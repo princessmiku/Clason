@@ -40,6 +40,8 @@ def _load_single(val, aType) -> any:
     if origin:
         args = typing.get_args(aType)
         if origin is list:
+            if isinstance(val, str):
+                val = json.loads(val)
             if args is list:
                 return [_load_single(newVal, args[0]) for newVal in val]
             if args is datetime:
